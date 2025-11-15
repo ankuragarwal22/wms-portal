@@ -1,0 +1,416 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>WMS Collaboration Portal — Live (Vercel + Supabase)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, Roboto, Arial; margin:0; padding:16px; background:#f6f7fb; color:#111; }
+    header { display:flex; gap:12px; align-items:center; margin-bottom:14px; }
+    .container { display:flex; gap:16px; }
+    .left, .right { background:white; padding:12px; border-radius:10px; box-shadow:0 6px 18px rgba(15,23,42,0.06); }
+    .left { width:360px; }
+    .right { flex:1; min-height:600px; }
+    h2 { margin:6px 0 10px 0; font-size:16px; }
+    button { padding:8px 10px; border-radius:8px; border: none; cursor:pointer; }
+    .card { padding:8px; border-radius:8px; margin-bottom:8px; border:1px solid #eee; }
+    .milestone { display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-radius:6px; margin:6px 0; }
+    .dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:8px; vertical-align:middle; }
+    .red { background:#ff4d4f; }
+    .yellow { background:#ffd666; }
+    .green { background:#52c41a; }
+    .muted { color:#666; font-size:13px; }
+    textarea { width:100%; min-height:80px; }
+    input[type="date"] { padding:6px; border-radius:6px; border:1px solid #ddd; }
+    .flex { display:flex; gap:8px; align-items:center; }
+    .topbar { margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+    .chat { height:240px; overflow:auto; border:1px solid #eee; padding:8px; border-radius:8px; background:#fbfbff; }
+    .msg { padding:6px 8px; border-radius:8px; margin-bottom:6px; background:#fff; border:1px solid #eee; }
+    .small { font-size:12px; color:#666; }
+    .tag { background:#eef2ff; padding:4px 8px; border-radius:999px; font-size:12px; }
+    .file { font-size:13px; color:#0b63d1; text-decoration:underline; cursor:pointer; }
+    footer { margin-top:10px; color:#777; font-size:13px; }
+    .hidden { display:none; }
+    a.btn { background:#111; color:white; padding:8px 10px; border-radius:8px; text-decoration:none; }
+    .status { font-weight:600; padding:6px 8px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0;">WMS Collaboration Portal — Live</h1>
+    <div style="margin-left:8px;" class="tag" id="modeTag">Mode: DEMO</div>
+    <div style="margin-left:auto" id="status" class="small muted">Not connected to Supabase</div>
+  </header>
+
+  <div class="container">
+    <div class="left">
+      <div class="topbar">
+        <button id="newPRDBtn">+ New PRD</button>
+        <a class="btn" id="deployVercel" href="#" target="_blank" style="display:none">Open on Vercel</a>
+      </div>
+
+      <h2>PRDs</h2>
+      <div id="prdList"></div>
+
+      <h2>GTM Docs</h2>
+      <div id="gtmList"></div>
+
+      <h2>Filters</h2>
+      <div class="card">
+        <label><input id="filterRed" type="checkbox" /> Show only urgent (red)</label><br/>
+        <label><input id="filterMine" type="checkbox" /> Show my items (owner)</label>
+      </div>
+    </div>
+
+    <div class="right">
+      <div id="mainArea">
+        <div id="welcome" class="card">
+          <h2>Quick Start</h2>
+          <p class="muted">This app uses Supabase for real-time shared data when `SUPABASE_URL` and `SUPABASE_ANON_KEY` are provided (set via Vercel environment variables). Otherwise it runs in DEMO mode with localStorage.</p>
+          <p class="muted">To make it live: Deploy to Vercel (one-click from README) and set env vars: <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>. Also create Supabase tables `prds` and `chats` (SQL provided in README).</p>
+        </div>
+
+        <div id="editor" class="card hidden">
+          <h2 id="editorTitle">New PRD</h2>
+          <input id="prdTitle" placeholder="PRD Title" style="width:100%; padding:8px; margin-bottom:8px;" />
+          <textarea id="prdBody" placeholder="Short description (optional)"></textarea>
+          <h3>Milestones</h3>
+          <div id="milestones"></div>
+          <div class="flex" style="margin-top:8px;">
+            <input id="msName" placeholder="Milestone name" />
+            <input id="msDate" type="date" />
+            <button id="addMsBtn">Add</button>
+          </div>
+          <div style="margin-top:8px; display:flex; gap:8px;">
+            <button id="savePrdBtn">Save PRD</button>
+            <button id="cancelPrdBtn">Cancel</button>
+          </div>
+        </div>
+
+        <div id="prdDetail" class="card hidden">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h2 id="detailTitle"></h2>
+              <div id="detailMeta" class="muted"></div>
+            </div>
+            <div>
+              <button id="editPrdBtn">Edit</button>
+              <button id="deletePrdBtn">Delete</button>
+            </div>
+          </div>
+
+          <h3>Milestones</h3>
+          <div id="detailMilestones"></div>
+
+          <h3>Discussion</h3>
+          <div class="chat" id="chatBox"></div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <input id="chatUser" placeholder="Your name" />
+            <input id="chatInput" placeholder="Say something..." style="flex:1" />
+            <button id="sendChat">Send</button>
+          </div>
+
+          <h3 style="margin-top:12px">GTM Docs (attach)</h3>
+          <input id="gtmFile" type="file" />
+          <div id="attachedFiles"></div>
+        </div>
+
+      </div>
+
+      <footer>
+        <div>Prototype — deploy to Vercel and set Supabase env vars for live use.</div>
+      </footer>
+    </div>
+  </div>
+
+<script>
+/* Configuration:
+   Vercel should set SUPABASE_URL and SUPABASE_ANON_KEY as environment variables.
+   In Vercel, these will be available via process.env and exposed at build time into window.__ENV__
+   For this static file, we check for window.__ENV__ or for inline meta tags.
+   If no Supabase keys are present, app runs in DEMO mode using localStorage.
+*/
+
+function env(key) {
+  if (window.__ENV__ && window.__ENV__[key]) return window.__ENV__[key];
+  const meta = document.querySelector('meta[name="'+key+'"]');
+  if (meta) return meta.getAttribute('content');
+  return null;
+}
+
+const SUPABASE_URL = env('SUPABASE_URL');
+const SUPABASE_ANON_KEY = env('SUPABASE_ANON_KEY');
+
+let supabase = null;
+let connectedToSupabase = false;
+
+if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+  try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    connectedToSupabase = true;
+    document.getElementById('modeTag').innerText = 'Mode: LIVE (Supabase)';
+    document.getElementById('status').innerText = 'Connected to Supabase (read/write)';
+  } catch(e) {
+    console.error('Supabase init failed', e);
+  }
+} else {
+  document.getElementById('modeTag').innerText = 'Mode: DEMO (localStorage)';
+  document.getElementById('status').innerText = 'Not connected to Supabase';
+}
+
+/* Storage abstraction */
+const LS_KEY = 'wms_demo_data';
+function loadStateLocal() {
+  const raw = localStorage.getItem(LS_KEY);
+  if (!raw) {
+    const seed = { prds: [], gtm: [], chats: [] };
+    localStorage.setItem(LS_KEY, JSON.stringify(seed));
+    return seed;
+  }
+  try { return JSON.parse(raw); } catch(e){ return { prds:[], gtm:[], chats:[] }; }
+}
+function saveStateLocal(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+
+/* Utility */
+const el = id => document.getElementById(id);
+const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+function formatDateOffset(offsetDays) { const d = new Date(); d.setDate(d.getDate() + offsetDays); return d.toISOString().slice(0,10); }
+
+function calcColor(ms) {
+  if (!ms || !ms.date) return 'green';
+  const due = new Date(ms.date); due.setHours(0,0,0,0);
+  const now = today();
+  const diff = (due - now)/(1000*60*60*24);
+  if ((ms.status||'') === 'Done') return 'green';
+  if (diff < 0) return 'red';
+  if (diff <= 1) return 'yellow';
+  return 'green';
+}
+
+/* --- Supabase functions (minimal) ---
+Tables expected:
+CREATE TABLE prds (
+  id text primary key,
+  title text,
+  body text,
+  milestones jsonb,
+  created_at timestamptz default now()
+);
+CREATE TABLE chats (
+  id text primary key,
+  prd_id text,
+  user_name text,
+  text text,
+  ts bigint
+);
+Make tables RLS off or create anon key with proper policies for demo.
+-------------------------------------*/
+
+async function fetchPRDs() {
+  if (connectedToSupabase) {
+    const { data, error } = await supabase.from('prds').select('*').order('created_at', {ascending:false});
+    if (error) { console.error(error); return []; }
+    return data;
+  } else {
+    const s = loadStateLocal(); return s.prds || [];
+  }
+}
+
+async function fetchChats(prdId) {
+  if (connectedToSupabase) {
+    const { data, error } = await supabase.from('chats').select('*').eq('prd_id', prdId).order('ts', {ascending:true});
+    if (error) { console.error(error); return []; }
+    return data;
+  } else {
+    const s = loadStateLocal(); return (s.chats||[]).filter(c=>c.prdId===prdId);
+  }
+}
+
+async function insertPRD(prd) {
+  if (connectedToSupabase) {
+    const { data, error } = await supabase.from('prds').insert(prd);
+    if (error) { console.error(error); throw error; }
+    return data;
+  } else {
+    const s = loadStateLocal(); s.prds.unshift(prd); saveStateLocal(s); return prd;
+  }
+}
+
+async function updatePRD(id, changes) {
+  if (connectedToSupabase) {
+    const { data, error } = await supabase.from('prds').update(changes).eq('id', id);
+    if (error) { console.error(error); throw error; }
+    return data;
+  } else {
+    const s = loadStateLocal(); const p = s.prds.find(x=>x.id===id); Object.assign(p, changes); saveStateLocal(s); return p;
+  }
+}
+
+async function deletePRD(id) {
+  if (connectedToSupabase) {
+    await supabase.from('prds').delete().eq('id', id);
+  } else {
+    const s = loadStateLocal(); s.prds = s.prds.filter(p=>p.id!==id); saveStateLocal(s);
+  }
+}
+
+async function insertChat(msg) {
+  if (connectedToSupabase) {
+    await supabase.from('chats').insert(msg);
+  } else {
+    const s = loadStateLocal(); s.chats.push(msg); saveStateLocal(s);
+  }
+}
+
+/* Real-time subscription to prds and chats */
+function setupRealtime() {
+  if (!connectedToSupabase) return;
+  // Listen to inserts/updates on prds
+  supabase.channel('public:prds').on('postgres_changes', {event: '*', schema: 'public', table: 'prds'}, payload => {
+    console.log('prds change', payload);
+    renderPRDList();
+  }).subscribe();
+  supabase.channel('public:chats').on('postgres_changes', {event: '*', schema: 'public', table: 'chats'}, payload => {
+    console.log('chats change', payload);
+    // if open detail matches, re-render chats
+    if (window._openPRD) renderChat(window._openPRD);
+  }).subscribe();
+}
+
+/* Rendering */
+async function renderPRDList() {
+  const list = el('prdList'); list.innerHTML='';
+  const prds = await fetchPRDs();
+  const filterRed = el('filterRed').checked;
+  for (const prd of prds) {
+    const card = document.createElement('div'); card.className='card';
+    const title = document.createElement('div'); title.innerHTML = `<strong>${prd.title}</strong>`;
+    const meta = document.createElement('div'); meta.className='muted small';
+    meta.innerText = (prd.milestones||[]).length + ' milestones';
+    const msWrap = document.createElement('div');
+    (prd.milestones||[]).slice(0,3).forEach(ms=>{
+      const color = calcColor(ms);
+      if (filterRed && color !== 'red') return;
+      const m = document.createElement('div'); m.className='milestone';
+      m.innerHTML = `<div><span class="dot ${color}"></span>${ms.name}</div><div class="muted">${ms.date||''}</div>`;
+      msWrap.appendChild(m);
+    });
+    card.appendChild(title); card.appendChild(meta); card.appendChild(msWrap);
+    card.onclick = ()=> openPRD(prd.id);
+    list.appendChild(card);
+  }
+}
+
+async function openPRD(id) {
+  const prds = await fetchPRDs();
+  const prd = prds.find(p=>p.id===id);
+  if (!prd) return;
+  window._openPRD = id;
+  el('welcome').classList.add('hidden');
+  el('editor').classList.add('hidden');
+  el('prdDetail').classList.remove('hidden');
+  el('detailTitle').innerText = prd.title;
+  el('detailMeta').innerText = prd.body || '';
+  const dm = el('detailMilestones'); dm.innerHTML='';
+  (prd.milestones||[]).forEach(ms=>{
+    const color = calcColor(ms);
+    const row = document.createElement('div'); row.className='milestone';
+    row.innerHTML = `<div><span class="dot ${color}"></span><strong>${ms.name}</strong></div>
+                     <div class="muted">${ms.date||''}</div>`;
+    dm.appendChild(row);
+  });
+  renderChat(id);
+  el('editPrdBtn').onclick = ()=> editPRD(prd.id);
+  el('deletePrdBtn').onclick = async ()=> {
+    if (!confirm('Delete PRD?')) return;
+    await deletePRD(prd.id); renderPRDList(); el('prdDetail').classList.add('hidden'); el('welcome').classList.remove('hidden');
+  };
+}
+
+async function renderChat(prdId) {
+  const box = el('chatBox'); box.innerHTML='';
+  const msgs = await fetchChats(prdId);
+  for (const m of msgs) {
+    const d = document.createElement('div'); d.className='msg';
+    const time = m.ts ? new Date(+m.ts).toLocaleString() : (m.created_at ? new Date(m.created_at).toLocaleString() : '');
+    d.innerHTML = `<div><strong>${m.user_name||m.user||'Anon'}</strong> <span class="small muted">${time}</span></div>
+                   <div>${m.text}</div>`;
+    box.appendChild(d);
+  }
+  box.scrollTop = box.scrollHeight;
+  el('sendChat').onclick = async ()=> {
+    const user = el('chatUser').value || 'Anon';
+    const text = el('chatInput').value.trim();
+    if (!text) return;
+    const id = 'chat_' + Math.random().toString(36).slice(2,9);
+    const msg = connectedToSupabase ? { id, prd_id: prdId, user_name: user, text, ts: Date.now() } : { id, prdId, user, text, ts: Date.now() };
+    await insertChat(msg);
+    el('chatInput').value=''; renderChat(prdId);
+  };
+}
+
+/* Editor flows (create/edit) */
+document.getElementById('newPRDBtn').onclick = ()=> {
+  el('editorTitle').innerText = 'New PRD'; el('welcome').classList.add('hidden'); el('editor').classList.remove('hidden'); el('prdDetail').classList.add('hidden');
+  el('prdTitle').value=''; el('prdBody').value=''; el('milestones').innerHTML=''; window._tempPrd = { milestones: [] };
+};
+
+document.getElementById('addMsBtn').onclick = ()=> {
+  const name = el('msName').value.trim(); const date = el('msDate').value;
+  if (!name) return alert('Add milestone name');
+  window._tempPrd.milestones.push({ name, date, status: 'Todo' });
+  const wrap = el('milestones'); const row = document.createElement('div'); row.className='card';
+  row.innerHTML = `<div>${name} — <span class="muted">${date}</span></div>`; wrap.appendChild(row);
+  el('msName').value=''; el('msDate').value='';
+};
+
+document.getElementById('savePrdBtn').onclick = async ()=> {
+  const title = el('prdTitle').value || 'Untitled PRD';
+  const body = el('prdBody').value || '';
+  const id = 'prd_' + Math.random().toString(36).slice(2,9);
+  const prd = { id, title, body, milestones: window._tempPrd.milestones || [], created_at: new Date().toISOString() };
+  await insertPRD(prd); renderPRDList(); openPRD(prd.id);
+};
+
+document.getElementById('cancelPrdBtn').onclick = ()=> { el('editor').classList.add('hidden'); el('welcome').classList.remove('hidden'); window._tempPrd=null; };
+
+el('filterRed').onchange = renderPRDList;
+el('filterMine').onchange = renderPRDList;
+
+/* Init seed when no data */
+async function init() {
+  if (!connectedToSupabase) {
+    const s = loadStateLocal();
+    if (!s.prds.length) {
+      s.prds.unshift({ id:'prd_x1', title:'WMS Inventory Sync', body:'Sync design for in-house WMS', milestones:[
+        {name:'Spec Ready', date: formatDateOffset(0), status:'Done'},
+        {name:'Backend APIs', date: formatDateOffset(1), status:'InProgress'},
+        {name:'Integration QA', date: formatDateOffset(2), status:'Todo'}
+      ], files:[], created_at: new Date().toISOString()});
+      s.prds.unshift({ id:'prd_x2', title:'GTM Delivery Ops', body:'GTM checklist for WMS launch', milestones:[
+        {name:'Checklist Ready', date: formatDateOffset(-1), status:'Todo'},
+        {name:'Dry Run', date: formatDateOffset(3), status:'Todo'}
+      ], files:[], created_at: new Date().toISOString()});
+      saveStateLocal(s);
+    }
+  } else {
+    setupRealtime();
+  }
+  renderPRDList();
+  // show deploy button if Vercel url present
+  const vercelUrl = window.location.href;
+  if (vercelUrl && vercelUrl.includes('vercel.app')) {
+    const btn = document.getElementById('deployVercel'); btn.style.display='none';
+  } else {
+    document.getElementById('deployVercel').style.display='inline-block';
+    document.getElementById('deployVercel').href = 'https://vercel.com/new';
+  }
+}
+
+init();
+
+</script>
+</body>
+</html>
